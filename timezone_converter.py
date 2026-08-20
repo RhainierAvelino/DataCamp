@@ -1,3 +1,22 @@
+import json
+import os
+from datetime import datetime
+from zoneinfo import ZoneInfo
+
+from openai import OpenAI
+
+
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+
+def convert_timezone(date_time, from_timezone, to_timezone):
+    """Convert an ISO datetime from one IANA timezone to another."""
+    local_time = datetime.fromisoformat(date_time)
+    source_time = local_time.replace(tzinfo=ZoneInfo(from_timezone))
+    converted_time = source_time.astimezone(ZoneInfo(to_timezone))
+    return converted_time.isoformat()
+
+
 tools = [
     {
         # Define a function tool called convert_timezone
