@@ -1,15 +1,16 @@
 # Import the libraries needed to work with environment variables,
 # call the OpenAI API, and compute vector similarity.
 import os  # Lets us read configuration values, such as the API key, from the environment.
-import openai as OpenAI  # The OpenAI Python package used to request text embeddings.
-import numpy as np  # Provides numerical array utilities for working with vectors.
-from sklearn.manifold import TSNE  # Can reduce vectors to two dimensions for visualization.
+from openai import OpenAI  # Provides the client used to request text embeddings.
 from scipy.spatial import distance  # Provides cosine distance for comparing vectors.
 
 # Initialize the OpenAI client using the API key stored in the environment.
 # ``os.environ[...]`` reads the variable and raises an error if it has not been set.
 # Keeping the key in an environment variable is safer than writing it directly in code.
-client = OpenAI.OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+
+# Use one model for both articles and queries so their vectors are comparable.
+EMBEDDING_MODEL = "text-embedding-3-small"
 
 # Each article is a dictionary with a headline, topic, and keywords.
 # These items will later be converted into text and then embeddings.
@@ -57,6 +58,15 @@ def create_article_text(article):
         Topic: {article['topic']}
         Keywords: {', '.join(article['keywords'])}"""
     )
+
+
+def create_article_embeddings(texts):
+    """Create one embedding vector for each text in ``texts``."""
+    response = client.embeddings.create(
+        model=EMBEDDING_MODEL,
+        input=texts,
+    )
+    return [item.embedding for item in response.data]
 
 
 # Convert each article into a text string before creating embeddings.
