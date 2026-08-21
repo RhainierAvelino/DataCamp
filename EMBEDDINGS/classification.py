@@ -2,8 +2,6 @@ import os
 from openai import OpenAI
 from scipy.spatial import distance
 
-# Keep the model name here so importing this file does not execute the complete
-# semantic-search example and make additional API requests.
 EMBEDDING_MODEL = "text-embedding-3-small"
 
 
