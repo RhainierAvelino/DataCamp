@@ -1,91 +1,78 @@
+"""Let a model call a local Python function to convert between time zones."""
+
 import json
-import os
 from datetime import datetime
 from zoneinfo import ZoneInfo
 
 from openai import OpenAI
 
 
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = OpenAI()
+MODEL = "gpt-5.4-mini"
 
 
 def convert_timezone(date_time, from_timezone, to_timezone):
-    """Convert an ISO datetime from one IANA timezone to another."""
+    """Convert a naive ISO datetime from one IANA timezone to another."""
     local_time = datetime.fromisoformat(date_time)
     source_time = local_time.replace(tzinfo=ZoneInfo(from_timezone))
-    converted_time = source_time.astimezone(ZoneInfo(to_timezone))
-    return converted_time.isoformat()
+    return source_time.astimezone(ZoneInfo(to_timezone)).isoformat()
 
 
+# This schema tells the model when it can use the local Python function.
 tools = [
     {
-        # Define a function tool called convert_timezone
         "type": "function",
         "name": "convert_timezone",
-        "description": "Convert a datetime from one timezone to another using the OpenTimezone API.",
+        "description": "Convert an ISO datetime from one IANA timezone to another.",
         "parameters": {
             "type": "object",
-            # Define the parameter names, types, and descriptions
             "properties": {
                 "date_time": {
                     "type": "string",
-                    "description": "The datetime string in ISO format (e.g., '2025-01-20T14:30:00')"
+                    "description": "A local ISO datetime, for example 2026-01-20T14:30:00.",
                 },
                 "from_timezone": {
                     "type": "string",
-                    "description": "The source timezone (e.g., 'America/New_York', 'Asia/Tokyo')"
+                    "description": "The source IANA timezone, for example America/New_York.",
                 },
                 "to_timezone": {
                     "type": "string",
-                    "description": "The target timezone (e.g., 'Europe/London', 'Australia/Sydney')"
-                }
+                    "description": "The target IANA timezone, for example Asia/Tokyo.",
+                },
             },
-            # Ensure that all three parameters are required
             "required": ["date_time", "from_timezone", "to_timezone"],
-            "additionalProperties": False
-        }
+            "additionalProperties": False,
+        },
+        "strict": True,
     }
 ]
 
-messages = [
-    {
-        "role": "user",
-        "content": "What time is 2:30pm on January 20th in New York in Tokyo time?"
-    }
-]
-
-response = client.responses.create(
-    model="gpt-5.4-mini",
-    input=messages,
-    tools=tools
+user_request = (
+    "What time is 2026-01-20T14:30:00 in America/New_York when converted "
+    "to Asia/Tokyo? Use the conversion tool."
 )
 
-messages += response.output
+# First request: the model decides which function to call and supplies its arguments.
+response = client.responses.create(model=MODEL, input=user_request, tools=tools)
 
-# Process function calls and execute the timezone conversion
+tool_outputs = []
 for item in response.output:
-    if item.type == "function_call":
-        if item.name == "convert_timezone":
-            timezone_result = convert_timezone(
-                **json.loads(item.arguments)
-            )
+    if item.type == "function_call" and item.name == "convert_timezone":
+        result = convert_timezone(**json.loads(item.arguments))
+        tool_outputs.append(
+            {
+                "type": "function_call_output",
+                "call_id": item.call_id,
+                "output": json.dumps({"converted_time": result}),
+            }
+        )
 
-            # Append function output to messages
-            messages.append(
-                {
-                    "type": "function_call_output",
-                    "call_id": item.call_id,
-                    "output": json.dumps(
-                        {"convert_timezone": timezone_result}
-                    )
-                }
-            )
-
-# Make second API request with function results
-response = client.responses.create(
-    model="gpt-5.4-mini",
-    input=messages,
-    tools=tools
-)
+# Second request gives the function result back to the model so it can answer clearly.
+if tool_outputs:
+    response = client.responses.create(
+        model=MODEL,
+        input=[*response.output, *tool_outputs],
+        tools=tools,
+    )
 
 print(response.output_text)

@@ -1,23 +1,41 @@
+"""Use ChromaDB to store documents and perform a semantic search query."""
+
+import os
+
 import chromadb
 from chromadb.utils.embedding_functions import OpenAIEmbeddingFunction
 
-client = chromadb.PersistentClient(path="./path/to/save/database")
+
 EMBEDDING_MODEL = "text-embedding-3-small"
 
-# Create a new collection in the database with an embedding function that uses the OpenAI API.
-collection = client.create_collection(
-    name="netflix_titles", #use as a reference to the collection
-    # OpenAIEmbeddingFunction wraps the OpenAI API to generate embeddings for documents.
-    embedding_function=OpenAIEmbeddingFunction(
-        api_key="YOUR_OPENAI_API_KEY",
-        model_name=EMBEDDING_MODEL
-    )
+# PersistentClient saves the database in this folder so it is available next time.
+chroma_client = chromadb.PersistentClient(path="./chroma_db")
+embedding_function = OpenAIEmbeddingFunction(
+    api_key=os.environ["OPENAI_API_KEY"],
+    model_name=EMBEDDING_MODEL,
 )
 
-# Adding embedded data to the collection
-result = collection.query( # query the collection for similar documents
-    query_texts=["A story about a young wizard who discovers his magical heritage."],
-    n_results=3
+# get_or_create_collection makes this sample safe to run more than once.
+collection = chroma_client.get_or_create_collection(
+    name="netflix_titles",
+    embedding_function=embedding_function,
 )
 
-print(result)  # Returns the top 3 most similar documents to the query text
+documents = [
+    "A young wizard discovers his magical heritage and attends a school of magic.",
+    "A group of astronauts travel through a wormhole to save humanity.",
+    "A detective investigates a mystery in a small coastal town.",
+]
+
+# upsert adds new documents or replaces documents with the same IDs.
+collection.upsert(
+    ids=["wizard", "space", "detective"],
+    documents=documents,
+)
+
+query = "A fantasy adventure about a student learning magic"
+results = collection.query(query_texts=[query], n_results=3)
+
+print(f"Search results for: {query}\n")
+for document, distance in zip(results["documents"][0], results["distances"][0]):
+    print(f"- {document} (distance: {distance:.3f})")

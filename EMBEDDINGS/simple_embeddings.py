@@ -1,13 +1,15 @@
+"""Create and inspect one text embedding."""
+
 from openai import OpenAI
-import os
 
 
-client = OpenAI(api_key=os.environ["OPENAI_API_KEY"])
+client = OpenAI()
+EMBEDDING_MODEL = "text-embedding-3-large"
+text = "The quick brown fox jumped over the lazy dog."
 
-response = client.embeddings.create(
-    model="text-embedding-3-large",
-    input="The quick brown fox jumped over the lazy dog."
-)
+# An embedding is a list of numbers that represents the meaning of this text.
+response = client.embeddings.create(model=EMBEDDING_MODEL, input=text)
+embedding = response.data[0].embedding
 
-response_dict = response.model_dump()  # Convert the response to a dictionary
-print(response_dict)
+print(f"Embedding dimensions: {len(embedding)}")
+print(f"First 10 values: {embedding[:10]}")

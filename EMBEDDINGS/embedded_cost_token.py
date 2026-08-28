@@ -1,10 +1,22 @@
+"""Estimate the token count and embedding cost before sending a request."""
+
 import tiktoken
 
-enc = tiktoken.get_encoding("text-embedding-3-small")
 
-total_tokens = sum(len(enc.encode(text)) for text in documents)  # Count the total number of tokens in the documents
+EMBEDDING_MODEL = "text-embedding-3-small"
+# Check the OpenAI pricing page when using this as a real cost estimate.
+COST_PER_MILLION_TOKENS = 0.02
 
-cost_per_1k_tokens = 0.0004  # Cost per 1,000 tokens for the text-embedding-3-small model
+documents = [
+    "Embeddings represent the meaning of text as numbers.",
+    "Cosine similarity can compare the meaning of two embeddings.",
+    "A vector database stores embeddings for efficient retrieval.",
+]
+
+# This tokenizer matches the model family and converts text into tokens.
+encoder = tiktoken.encoding_for_model(EMBEDDING_MODEL)
+total_tokens = sum(len(encoder.encode(document)) for document in documents)
+estimated_cost = total_tokens / 1_000_000 * COST_PER_MILLION_TOKENS
 
 print(f"Total tokens: {total_tokens}")
-total_cost = (total_tokens / 1000) * cost_per_1k_tokens
+print(f"Estimated embedding cost: ${estimated_cost:.8f}")
